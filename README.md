@@ -1,5 +1,3 @@
-# discord-simple-music-bot
-
 ## Structure
 ```
 project
@@ -15,23 +13,23 @@ project
 ```
 
 ## Commands
-***!play***<br>
-> Play a video or a playlist on YouTube
-> 
-***!skip***<br>
-> Skip a song
+- ### ***!play***<br>
+     *Play a video or a playlist on YouTube*
 
-***!pause***<br>
-> Pause the song
+- ### ***!skip***<br>
+     *Skip a song*
 
-***!resume***<br>
-> Resume the song
+- ### ***!pause***<br>
+     *Pause the song*
 
-***!show***<br>
-> Show the next ten songs
+- ### ***!resume***<br>
+     *Resume the song*
 
-***!exit***<br>
-> Exit voice channel
+- ### ***!show***<br>
+     *Show the next ten songs*
 
-***!help***<br>
-> Show the help message
+- ### ***!exit***<br>
+     *Exit voice channel*
+
+- ### ***!help***<br>
+     *Show the help message*
