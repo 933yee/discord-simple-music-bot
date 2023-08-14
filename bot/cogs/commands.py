@@ -139,7 +139,8 @@ class CommandsCog(commands.Cog):
                             "title": entry["title"],
                             "video_url": entry["url"],
                         }
-                        video_list.append(video_info)
+                        if entry["title"] != "Private video":
+                            video_list.append(video_info)
                     random.shuffle(video_list)
                 else:
                     # video url
@@ -189,7 +190,7 @@ class CommandsCog(commands.Cog):
         if ctx.guild.id in server_data:
             if len(server_data[ctx.guild.id]):
                 embed = discord.Embed(
-                    title="Playlist",
+                    title=f"Playlist ({len(server_data[ctx.guild.id])} songs remaining)",
                     color=discord.Color.purple(),
                 )
                 for index, song_info in enumerate(server_data[ctx.guild.id], start=1):
