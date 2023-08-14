@@ -12,7 +12,11 @@ class EventsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        if not member.bot and before.channel and not after.channel:
+        if member.bot and before.channel and not after.channel:
+            await before.channel.guild.voice_client.disconnect()
+            del server_data[before.channel.guild.id]
+
+        elif not member.bot and before.channel and not after.channel:
             if before.channel.guild.voice_client and len(before.channel.members) == 1:
                 await before.channel.guild.voice_client.disconnect()
                 del server_data[before.channel.guild.id]

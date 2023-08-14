@@ -1,7 +1,7 @@
 import discord
 import asyncio
 from discord.ext import commands
-from bot.config import getToken
+from config import getToken
 from cogs.commands import CommandsCog
 from cogs.events import EventsCog
 
@@ -10,6 +10,7 @@ intents.voice_states = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+bot.remove_command("help")
 
 
 async def addCogs():
