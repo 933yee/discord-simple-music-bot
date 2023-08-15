@@ -3,7 +3,8 @@ import discord
 from discord.ext import commands
 import yt_dlp
 import random
-from data.data import server_data
+from data.data import server_data, server_loop
+import json
 
 
 class CommandsCog(commands.Cog):
@@ -22,19 +23,22 @@ class CommandsCog(commands.Cog):
                 raise AttributeError("You must first join a voice channel")
 
             voice_channel = ctx.author.voice.channel
-            params = ctx.message.content.split(" ")
+            params = ctx.message.content.split()
             video_list = await self.ydl_extractor(
                 extract_music_url=False, given_url=params[1]
             )
 
             if ctx.guild.id not in server_data:
                 server_data[ctx.guild.id] = []
+                server_loop[ctx.guild.id] = False
 
             server_data[ctx.guild.id].extend(video_list)
 
             if not ctx.voice_client:
                 voice_client = await voice_channel.connect()
                 await self.play_song(ctx, voice_client)
+            elif not ctx.voice_client.is_playing():
+                await self.play_song(ctx, ctx.voice_client)
 
         except IndexError:
             send_message = "\n".join(
@@ -47,10 +51,6 @@ class CommandsCog(commands.Cog):
                 title="Command Format is Incorrect",
                 description=send_message,
                 color=discord.Color.red(),
-            )
-            embed.set_footer(
-                text="you sucks",
-                icon_url="https://media.tenor.com/hu4sl_5rDXcAAAAC/cat-catcry.gif",
             )
             await ctx.send(embed=embed)
 
@@ -71,7 +71,8 @@ class CommandsCog(commands.Cog):
     async def play_song(self, ctx, voice_client):
         async def play_next(ctx, voice_client):
             if ctx.guild.id in server_data:
-                server_data[ctx.guild.id].pop(0)
+                if not server_loop[ctx.guild.id]:
+                    server_data[ctx.guild.id].pop(0)
                 if server_data[ctx.guild.id]:
                     await self.play_song(ctx, voice_client)
                 else:
@@ -84,13 +85,13 @@ class CommandsCog(commands.Cog):
         if ctx.guild.id in server_data:
             video_url = server_data[ctx.guild.id][0]["video_url"]
             title = server_data[ctx.guild.id][0]["title"]
-
-            embed = discord.Embed(
-                title=f"Now playing\n",
-                description=f"♪ \u00A0 **[{title}]({video_url})**",
-                color=discord.Color.blue(),
-            )
-            await ctx.send(embed=embed)
+            if not server_loop[ctx.guild.id]:
+                embed = discord.Embed(
+                    title=f"Now playing\n",
+                    description=f"♪ \u00A0 **[{title}]({video_url})**",
+                    color=discord.Color.blue(),
+                )
+                await ctx.send(embed=embed)
 
             music_url = await self.ydl_extractor(
                 extract_music_url=True, given_url=video_url
@@ -132,7 +133,12 @@ class CommandsCog(commands.Cog):
             if extract_music_url:
                 return info["url"]
             else:
-                if "entries" in info:
+                if "ie_key" in info:
+                    # if the url is a video in a playlist
+                    return await self.ydl_extractor(
+                        extract_music_url=False, given_url=info["url"]
+                    )
+                elif "entries" in info:
                     # playlist url
                     for entry in info["entries"]:
                         video_info = {
@@ -151,12 +157,34 @@ class CommandsCog(commands.Cog):
                     video_list.append(video_info)
         return video_list
 
-    @commands.command(description="Skip a song\n" " ")
+    @commands.command(
+        description="Skip one or multiple songs\n"
+        "\u1CBC\u1CBC\u1CBC\u1CBC *`!skip {song number}(optional)`*\n"
+        ""
+    )
     async def skip(self, ctx):
         if ctx.guild.id in server_data:
             if len(server_data[ctx.guild.id]):
+                params = ctx.message.content.split()
+                num = params[1] if len(params) >= 2 else "#"
+                server_loop[ctx.guild.id] = False
+                if num.isdigit() and int(num) > 1:
+                    num = int(num)
+                    if num >= len(server_data[ctx.guild.id]):
+                        title = f"Skip {len(server_data[ctx.guild.id])} songs"
+                        server_data[ctx.guild.id] = server_data[ctx.guild.id][-1:]
+                    else:
+                        title = f"Skip {num} songs"
+                        server_data[ctx.guild.id] = (
+                            server_data[ctx.guild.id][num:]
+                            if server_loop[ctx.guild.id]
+                            else server_data[ctx.guild.id][num - 1 :]
+                        )
+                else:
+                    title = "Skip"
+
                 embed = discord.Embed(
-                    title="Skip",
+                    title=title,
                     color=discord.Color.green(),
                 )
                 await ctx.send(embed=embed)
@@ -185,12 +213,29 @@ class CommandsCog(commands.Cog):
                 await ctx.send(embed=embed)
                 ctx.voice_client.resume()
 
+    @commands.command(description="Enable or disable loop playback\n" " ")
+    async def loop(self, ctx):
+        if ctx.guild.id in server_data:
+            if ctx.voice_client.is_playing():
+                title = "Looping " + ("off" if server_loop[ctx.guild.id] else "on")
+                embed = discord.Embed(
+                    title=title,
+                    color=discord.Color.green(),
+                )
+                await ctx.send(embed=embed)
+                server_loop[ctx.guild.id] = not server_loop[ctx.guild.id]
+
     @commands.command(description="Show the next ten songs\n" " ")
     async def show(self, ctx):
         if ctx.guild.id in server_data:
             if len(server_data[ctx.guild.id]):
+                remain = (
+                    f"*({len(server_data[ctx.guild.id])} songs remaining)*"
+                    if len(server_data[ctx.guild.id]) > 10
+                    else ""
+                )
                 embed = discord.Embed(
-                    title=f"Playlist ({len(server_data[ctx.guild.id])} songs remaining)",
+                    title=f"Playlist ",
                     color=discord.Color.purple(),
                 )
                 for index, song_info in enumerate(server_data[ctx.guild.id], start=1):
@@ -199,7 +244,13 @@ class CommandsCog(commands.Cog):
                     video_url = song_info["video_url"]
                     title = song_info["title"]
                     embed.add_field(
-                        name=f"♪ \u00A0 Track {index}",
+                        name=f"♪ \u00A0 Track {index} "
+                        + (" *(playing)*" if index == 1 else "")
+                        + (
+                            " *(looping)*"
+                            if index == 1 and server_loop[ctx.guild.id]
+                            else ""
+                        ),
                         value=f"[{title}]({video_url})",
                         inline=False,
                     )
@@ -212,11 +263,22 @@ class CommandsCog(commands.Cog):
                 )
                 await ctx.send(embed=embed)
 
+    @commands.command(description="Shuffle the playlist\n" " ")
+    async def shuffle(self, ctx):
+        if ctx.guild.id in server_data:
+            shuffled_playlist = server_data[ctx.guild.id].copy()
+            random.shuffle(shuffled_playlist)
+            server_data[ctx.guild.id] = [
+                server_data[ctx.guild.id][0]
+            ] + shuffled_playlist
+            ctx.voice_client.stop()
+
     @commands.command(description="Exit voice channel\n" " ")
     async def exit(self, ctx):
         if ctx.guild.id in server_data:
             await ctx.voice_client.disconnect()
             del server_data[ctx.guild.id]
+            del server_loop[ctx.guild.id]
 
     @commands.command(description="Show the help message\n" " ")
     async def help(self, ctx):
@@ -234,4 +296,8 @@ class CommandsCog(commands.Cog):
                 inline=False,
             )
 
+            embed.set_footer(
+                text="✉️ kevins30102@yahoo.com.tw",
+                icon_url="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExaml6bnByNTZ4aXQxYmFxNWo3M2ZjaXM2emN4dTV1dmEwaWl1bXJraCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/oBQZIgNobc7ewVWvCd/200w.gif",
+            )
         await ctx.send(embed=embed)
