@@ -266,6 +266,7 @@ class CommandsCog(commands.Cog):
     @commands.command(description="Shuffle the playlist\n" " ")
     async def shuffle(self, ctx):
         if ctx.guild.id in server_data:
+            server_loop[ctx.guild.id] = False
             shuffled_playlist = server_data[ctx.guild.id].copy()
             random.shuffle(shuffled_playlist)
             server_data[ctx.guild.id] = [
