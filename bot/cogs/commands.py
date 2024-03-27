@@ -235,7 +235,7 @@ class CommandsCog(commands.Cog):
                     else ""
                 )
                 embed = discord.Embed(
-                    title=f"Playlist ",
+                    title=f"Playlist {remain}",
                     color=discord.Color.purple(),
                 )
                 for index, song_info in enumerate(server_data[ctx.guild.id], start=1):
